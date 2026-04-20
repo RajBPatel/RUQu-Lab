@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUQu: Quantum State Photon Distribution Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-8 font-sans">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg col-span-1">
+            <h2 class="text-2xl font-bold mb-6 text-blue-400">Quantum State Controls</h2>
+            
+            <div class="mb-5">
+                <label class="block text-sm font-medium mb-2 text-gray-300">Quantum State</label>
+                <select id="state" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="coherent">Coherent State</option>
+                    <option value="thermal">Thermal State</option>
+                    <option value="smsv">Single-Mode Squeezed Vacuum (SMSV)</option>
+                    <option value="tmsv">Two-Mode Squeezed Vacuum (TMSV)</option>
+                </select>
+            </div>
+
+            <hr class="border-gray-600 my-5">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">Initial Squeezing Parameter (r)</label>
+                    <input type="number" id="sq-r" step="0.01" min="0" max="3" value="0.00" disabled class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">Initial Squeezing (dB)</label>
+                    <input type="number" id="sq-db" step="0.1" min="0" max="26" value="0.0" disabled class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">Mean Photon Number &lang;<i>n</i>&rang;</label>
+                    <input type="number" id="mean-n" step="0.1" min="0.1" max="50" value="5.0" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <hr class="border-gray-600 my-5">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-300">Optical Loss (%)</label>
+                    <input type="number" id="loss" step="1" min="0" max="100" value="0" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div class="bg-gray-900 p-3 rounded border border-gray-700">
+                    <label class="block text-sm font-bold mb-1 text-green-400">Effective Squeezing (dB)</label>
+                    <input type="text" id="eff-sq" value="0.00" disabled class="w-full bg-transparent text-xl font-mono text-white disabled:opacity-100 focus:outline-none">
+                    <p class="text-xs text-gray-500 mt-1">Degradation due to vacuum mixing</p>
+                </div>
+
+                <div class="pt-2">
+                    <label class="block text-sm font-medium mb-1 text-gray-300">X-Axis Range (Max Photon <i>n</i>)</label>
+                    <input type="number" id="max-x" step="1" min="5" max="100" value="30" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg col-span-1 md:col-span-2 flex flex-col">
+            <h2 class="text-2xl font-bold mb-2 text-blue-400">Photon Number Distribution</h2>
+            <p class="text-sm text-gray-400 mb-4">Probability <i>P(n)</i> of detecting <i>n</i> photons.</p>
+            <div class="relative flex-grow min-h-[400px]">
+                <canvas id="chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const elState = document.getElementById('state');
+        const elR = document.getElementById('sq-r');
+        const elDb = document.getElementById('sq-db');
+        const elMean = document.getElementById('mean-n');
+        const elLoss = document.getElementById('loss');
+        const elMaxX = document.getElementById('max-x');
+        const elEffSq = document.getElementById('eff-sq');
+        const ctx = document.getElementById('chart').getContext('2d');
+
+        // Precompute log factorials
+        const logFact = [0];
+        for (let i = 1; i <= 1000; i++) {
+            logFact[i] = logFact[i - 1] + Math.log(i);
+        }
+
+        function binomialProb(n, k, p) {
+            if (k < 0 || k > n) return 0;
+            if (p === 0) return k === 0 ? 1 : 0;
+            if (p === 1) return k === n ? 1 : 0;
+            let logP = logFact[n] - logFact[k] - logFact[n - k] + k * Math.log(p) + (n - k) * Math.log(1 - p);
+            return Math.exp(logP);
+        }
+
+        let chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'P(n)',
+                    data: [],
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Photon Number (n)', color: '#9CA3AF' },
+                        ticks: { color: '#9CA3AF' },
+                        grid: { color: '#374151' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Probability P(n)', color: '#9CA3AF' },
+                        ticks: { color: '#9CA3AF' },
+                        grid: { color: '#374151' },
+                        beginAtZero: true
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        let isUpdating = false;
+
+        function updateFromR() {
+            if(isUpdating) return;
+            isUpdating = true;
+            let r = parseFloat(elR.value);
+            elDb.value = (8.685889638 * r).toFixed(3);
+            elMean.value = Math.pow(Math.sinh(r), 2).toFixed(3);
+            isUpdating = false;
+            drawChart();
+        }
+
+        function updateFromDb() {
+            if(isUpdating) return;
+            isUpdating = true;
+            let db = parseFloat(elDb.value);
+            let r = db / 8.685889638;
+            elR.value = r.toFixed(3);
+            elMean.value = Math.pow(Math.sinh(r), 2).toFixed(3);
+            isUpdating = false;
+            drawChart();
+        }
+
+        function updateFromMean() {
+            if(isUpdating) return;
+            isUpdating = true;
+            let n = parseFloat(elMean.value);
+            
+            if (elState.value === 'smsv' || elState.value === 'tmsv') {
+                let r = Math.asinh(Math.sqrt(n));
+                elR.value = r.toFixed(3);
+                elDb.value = (8.685889638 * r).toFixed(3);
+            }
+            isUpdating = false;
+            drawChart();
+        }
+
+        function toggleInputs() {
+            let s = elState.value;
+            let isSqueezed = (s === 'smsv' || s === 'tmsv');
+            
+            elR.disabled = !isSqueezed;
+            elDb.disabled = !isSqueezed;
+            
+            if (isSqueezed) {
+                updateFromMean(); 
+            } else {
+                elR.value = "0.00";
+                elDb.value = "0.0";
+            }
+            drawChart();
+        }
+
+        function calculateEffectiveSqueezing(r, loss) {
+            if (elState.value !== 'smsv' && elState.value !== 'tmsv' || r === 0) {
+                return "0.00";
+            }
+            let eta = 1 - loss;
+            let v_initial = Math.exp(-2 * r);
+            let v_eff = eta * v_initial + (1 - eta);
+            let s_eff = -10 * Math.log10(v_eff);
+            
+            return s_eff > 0 ? s_eff.toFixed(2) : "0.00";
+        }
+
+        function drawChart() {
+            let state = elState.value;
+            let n_mean = parseFloat(elMean.value);
+            let r = parseFloat(elR.value) || 0;
+            let loss = parseFloat(elLoss.value) / 100;
+            let maxX = parseInt(elMaxX.value);
+            
+            elEffSq.value = calculateEffectiveSqueezing(r, loss);
+
+            let buffer = 100; 
+            let N_compute = maxX + buffer;
+            let P_ideal = new Array(N_compute).fill(0);
+
+            if (state === 'coherent') {
+                P_ideal[0] = Math.exp(-n_mean);
+                for(let n=1; n<N_compute; n++) {
+                    P_ideal[n] = P_ideal[n-1] * n_mean / n;
+                }
+            } else if (state === 'thermal') {
+                P_ideal[0] = 1 / (1 + n_mean);
+                for(let n=1; n<N_compute; n++) {
+                    P_ideal[n] = P_ideal[n-1] * n_mean / (1 + n_mean);
+                }
+            } else if (state === 'smsv') {
+                let coshR = Math.cosh(r);
+                let tanhR2 = Math.pow(Math.tanh(r), 2);
+                P_ideal[0] = 1 / coshR;
+                for(let n=2; n<N_compute; n+=2) {
+                    P_ideal[n] = P_ideal[n-2] * ((n-1)/n) * tanhR2;
+                }
+            } else if (state === 'tmsv') {
+                let coshR2 = Math.pow(Math.cosh(r), 2);
+                let tanhR2 = Math.pow(Math.tanh(r), 2);
+                P_ideal[0] = 1 / coshR2;
+                for(let n=1; n<N_compute; n++) {
+                    P_ideal[n] = P_ideal[n-1] * tanhR2;
+                }
+            }
+
+            let eta = 1 - loss;
+            let P_lossy = new Array(maxX + 1).fill(0);
+            let labels = [];
+
+            for (let m = 0; m <= maxX; m++) {
+                labels.push(m);
+                for (let n = m; n < N_compute; n++) {
+                    P_lossy[m] += P_ideal[n] * binomialProb(n, m, eta);
+                }
+            }
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = P_lossy;
+            chart.update();
+        }
+
+        // Event Listeners
+        elState.addEventListener('change', toggleInputs);
+        elR.addEventListener('input', updateFromR);
+        elDb.addEventListener('input', updateFromDb);
+        elMean.addEventListener('input', updateFromMean);
+        elLoss.addEventListener('input', drawChart);
+        elMaxX.addEventListener('input', drawChart);
+
+        // Initialize
+        toggleInputs();
+    </script>
+</body>
+</html>

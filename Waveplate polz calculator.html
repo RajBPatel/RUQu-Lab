@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RUQu: Poincaré Sphere Polarization Simulator</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: monospace, sans-serif;
+        background-color: #111;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #canvas-container {
+        flex-grow: 1;
+        position: relative;
+      }
+      #controls {
+        background: #222;
+        padding: 20px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        border-top: 2px solid #444;
+      }
+      .control-group {
+        background: #333;
+        padding: 15px;
+        border-radius: 8px;
+        font-family: sans-serif;
+      }
+      .control-group h3 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 16px;
+        border-bottom: 1px solid #555;
+        padding-bottom: 5px;
+      }
+      .input-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .input-row label {
+        flex-grow: 1;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      input[type="number"] {
+        width: 60px;
+        background: #444;
+        color: white;
+        border: 1px solid #555;
+        padding: 4px;
+        border-radius: 4px;
+        margin-left: 10px;
+      }
+
+      #output-container {
+        grid-column: span 3;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .output-box {
+        text-align: center;
+        font-size: 18px;
+        background: #1a1a1a;
+        padding: 12px;
+        border-radius: 6px;
+      }
+      #output-quantum {
+        color: #00ffff;
+        font-weight: bold;
+        font-size: 20px;
+        letter-spacing: 1px;
+      }
+
+      .qwp1-color {
+        color: #ff5555;
+      }
+      .hwp-color {
+        color: #55ff55;
+      }
+      .qwp2-color {
+        color: #5555ff;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  </head>
+  <body>
+    <div id="canvas-container"></div>
+
+    <div id="controls">
+      <div class="control-group">
+        <h3 class="qwp1-color">Stage 1: QWP 1</h3>
+        <div class="input-row">
+          <label><input type="checkbox" id="q1_en" checked /> Enable</label>
+        </div>
+        <div class="input-row">
+          <label>Angle (&theta;):</label>
+          <input
+            type="number"
+            id="q1_num"
+            value="22.5"
+            step="0.1"
+            min="0"
+            max="180"
+          />
+        </div>
+        <input
+          type="range"
+          id="q1_slider"
+          value="22.5"
+          step="0.1"
+          min="0"
+          max="180"
+        />
+      </div>
+
+      <div class="control-group">
+        <h3 class="hwp-color">Stage 2: HWP</h3>
+        <div class="input-row">
+          <label><input type="checkbox" id="h_en" checked /> Enable</label>
+        </div>
+        <div class="input-row">
+          <label>Angle (&theta;):</label>
+          <input
+            type="number"
+            id="h_num"
+            value="45.0"
+            step="0.1"
+            min="0"
+            max="180"
+          />
+        </div>
+        <input
+          type="range"
+          id="h_slider"
+          value="45.0"
+          step="0.1"
+          min="0"
+          max="180"
+        />
+      </div>
+
+      <div class="control-group">
+        <h3 class="qwp2-color">Stage 3: QWP 2</h3>
+        <div class="input-row">
+          <label><input type="checkbox" id="q2_en" checked /> Enable</label>
+        </div>
+        <div class="input-row">
+          <label>Angle (&theta;):</label>
+          <input
+            type="number"
+            id="q2_num"
+            value="22.5"
+            step="0.1"
+            min="0"
+            max="180"
+          />
+        </div>
+        <input
+          type="range"
+          id="q2_slider"
+          value="22.5"
+          step="0.1"
+          min="0"
+          max="180"
+        />
+      </div>
+
+      <div id="output-container">
+        <div class="output-box" id="output-stokes">
+          Stokes: H/V = 1.000, D/A = 0.000, R/L = 0.000
+        </div>
+        <div class="output-box" id="output-quantum">
+          |&psi;&rang; = 1.000 |H&rang; + 0.000 |V&rang;
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- 1. Scene Setup ---
+      const container = document.getElementById("canvas-container");
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        container.clientWidth / container.clientHeight,
+        0.1,
+        100,
+      );
+      camera.position.set(2.5, 2.0, 3.5);
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      container.appendChild(renderer.domElement);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      // --- 2. Static Sphere and Axes ---
+      const sphereRadius = 1;
+      const sphereGeo = new THREE.SphereGeometry(sphereRadius, 32, 32);
+      const sphereMat = new THREE.MeshBasicMaterial({
+        color: 0x444444,
+        transparent: true,
+        opacity: 0.2,
+        wireframe: true,
+      });
+      scene.add(new THREE.Mesh(sphereGeo, sphereMat));
+
+      // NEW: Equatorial Plane (50% Grey, 50% Transparency)
+      const planeGeo = new THREE.CircleGeometry(sphereRadius, 64);
+      const planeMat = new THREE.MeshBasicMaterial({
+        color: 0x808080,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const equatorPlane = new THREE.Mesh(planeGeo, planeMat);
+      equatorPlane.rotation.x = Math.PI / 2; // Rotate to lay flat on the X-Z (equatorial) plane
+      scene.add(equatorPlane);
+
+      function createAxis(p1, p2, color) {
+        const mat = new THREE.LineBasicMaterial({
+          color: color,
+          transparent: true,
+          opacity: 0.5,
+        });
+        const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+        return new THREE.Line(geo, mat);
+      }
+
+      scene.add(
+        createAxis(
+          new THREE.Vector3(-1.2, 0, 0),
+          new THREE.Vector3(1.2, 0, 0),
+          0xffffff,
+        ),
+      ); // H/V
+      scene.add(
+        createAxis(
+          new THREE.Vector3(0, -1.2, 0),
+          new THREE.Vector3(0, 1.2, 0),
+          0xffffff,
+        ),
+      ); // R/L
+      scene.add(
+        createAxis(
+          new THREE.Vector3(0, 0, -1.2),
+          new THREE.Vector3(0, 0, 1.2),
+          0xffffff,
+        ),
+      ); // D/A
+
+      function createLabel(text, position, colorStr) {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = 128;
+        canvas.height = 128;
+        context.font = "Bold 60px Arial";
+        context.fillStyle = colorStr;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(text, 64, 64);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({
+          map: texture,
+          depthTest: false,
+        });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.position.copy(position);
+        sprite.scale.set(0.3, 0.3, 0.3);
+        return sprite;
+      }
+
+      scene.add(createLabel("H", new THREE.Vector3(1.15, 0, 0), "white"));
+      scene.add(createLabel("V", new THREE.Vector3(-1.15, 0, 0), "white"));
+      scene.add(createLabel("R", new THREE.Vector3(0, 1.15, 0), "white"));
+      scene.add(createLabel("L", new THREE.Vector3(0, -1.15, 0), "white"));
+      scene.add(createLabel("D", new THREE.Vector3(0, 0, 1.15), "white"));
+      scene.add(createLabel("A", new THREE.Vector3(0, 0, -1.15), "white"));
+
+      // --- 3. Dynamic Elements ---
+      const dynamicGroup = new THREE.Group();
+      scene.add(dynamicGroup);
+
+      function drawArc(vStart, axis, angle, color) {
+        const points = [];
+        const segments = 30;
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const currentAngle = t * angle;
+          const pt = vStart.clone().applyAxisAngle(axis, currentAngle);
+          points.push(pt);
+        }
+        const geo = new THREE.BufferGeometry().setFromPoints(points);
+        const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+        return new THREE.Line(geo, mat);
+      }
+
+      function drawPoint(pos, color, size = 0.05) {
+        const geo = new THREE.SphereGeometry(size, 16, 16);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        return mesh;
+      }
+
+      function drawRotationAxis(axisVec, color) {
+        const p1 = axisVec.clone().multiplyScalar(1.1);
+        const p2 = axisVec.clone().multiplyScalar(-1.1);
+        const mat = new THREE.LineDashedMaterial({
+          color: color,
+          dashSize: 0.05,
+          gapSize: 0.05,
+        });
+        const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+        const line = new THREE.Line(geo, mat);
+        line.computeLineDistances();
+        return line;
+      }
+
+      // --- 4. Quantum State Formatting ---
+      function formatQuantumState(S1, S2, S3) {
+        let cH = Math.sqrt(Math.max(0, (1 + S1) / 2));
+        let cV_re = 0;
+        let cV_im = 0;
+
+        // Avoid division by zero when state is purely |V> (S1 = -1)
+        if (cH > 0.0001) {
+          cV_re = S2 / (2 * cH);
+          cV_im = S3 / (2 * cH);
+        } else {
+          cH = 0;
+          cV_re = 1;
+          cV_im = 0;
+        }
+
+        const formatNum = (n) =>
+          Math.abs(n) < 0.0005 ? "0.000" : n.toFixed(3);
+
+        let cH_str = formatNum(cH);
+        let cV_re_str = formatNum(cV_re);
+        let cV_im_str = formatNum(Math.abs(cV_im));
+        let sign = cV_im < 0 ? "-" : "+";
+
+        let cV_term = `${cV_re_str} ${sign} ${cV_im_str}i`;
+
+        // Simplify purely real or purely imaginary terms
+        if (Math.abs(cV_im) < 0.0005) cV_term = `${cV_re_str}`;
+        else if (Math.abs(cV_re) < 0.0005)
+          cV_term = `${sign === "-" ? "-" : ""}${cV_im_str}i`;
+
+        // Wrap complex terms in parentheses
+        if (Math.abs(cV_im) >= 0.0005 && Math.abs(cV_re) >= 0.0005) {
+          cV_term = `(${cV_term})`;
+        }
+
+        // Construct final Dirac notation string
+        if (cH === 0) return `|&psi;&rang; = ${cV_term} |V&rang;`;
+        if (Math.abs(cV_re) < 0.0005 && Math.abs(cV_im) < 0.0005)
+          return `|&psi;&rang; = ${cH_str} |H&rang;`;
+
+        return `|&psi;&rang; = ${cH_str} |H&rang; + ${cV_term} |V&rang;`;
+      }
+
+      // --- 5. Math & Update Logic ---
+      function updateSimulation() {
+        dynamicGroup.clear();
+
+        const q1_en = document.getElementById("q1_en").checked;
+        const q1_theta =
+          (parseFloat(document.getElementById("q1_num").value) * Math.PI) / 180;
+        const h_en = document.getElementById("h_en").checked;
+        const h_theta =
+          (parseFloat(document.getElementById("h_num").value) * Math.PI) / 180;
+        const q2_en = document.getElementById("q2_en").checked;
+        const q2_theta =
+          (parseFloat(document.getElementById("q2_num").value) * Math.PI) / 180;
+
+        const c_q1 = 0xff5555,
+          c_h = 0x55ff55,
+          c_q2 = 0x5555ff;
+        let currentState = new THREE.Vector3(1, 0, 0);
+        dynamicGroup.add(drawPoint(currentState, 0xffffff, 0.04));
+
+        if (q1_en) {
+          const axisQ1 = new THREE.Vector3(
+            Math.cos(2 * q1_theta),
+            0,
+            Math.sin(2 * q1_theta),
+          ).normalize();
+          dynamicGroup.add(drawRotationAxis(axisQ1, c_q1));
+          dynamicGroup.add(drawArc(currentState, axisQ1, Math.PI / 2, c_q1));
+          currentState.applyAxisAngle(axisQ1, Math.PI / 2);
+          dynamicGroup.add(drawPoint(currentState, c_q1, 0.04));
+        }
+
+        if (h_en) {
+          const axisH = new THREE.Vector3(
+            Math.cos(2 * h_theta),
+            0,
+            Math.sin(2 * h_theta),
+          ).normalize();
+          dynamicGroup.add(drawRotationAxis(axisH, c_h));
+          dynamicGroup.add(drawArc(currentState, axisH, Math.PI, c_h));
+          currentState.applyAxisAngle(axisH, Math.PI);
+          dynamicGroup.add(drawPoint(currentState, c_h, 0.04));
+        }
+
+        if (q2_en) {
+          const axisQ2 = new THREE.Vector3(
+            Math.cos(2 * q2_theta),
+            0,
+            Math.sin(2 * q2_theta),
+          ).normalize();
+          dynamicGroup.add(drawRotationAxis(axisQ2, c_q2));
+          dynamicGroup.add(drawArc(currentState, axisQ2, Math.PI / 2, c_q2));
+          currentState.applyAxisAngle(axisQ2, Math.PI / 2);
+        }
+
+        dynamicGroup.add(drawPoint(currentState, 0xffff00, 0.07));
+
+        // Coordinate mapping: X = S1(H/V), Z = S2(D/A), Y = S3(R/L)
+        const S1 = currentState.x;
+        const S2 = currentState.z;
+        const S3 = currentState.y;
+
+        document.getElementById("output-stokes").innerHTML =
+          `Stokes Vector: H/V = ${S1.toFixed(3)}, D/A = ${S2.toFixed(3)}, R/L = ${S3.toFixed(3)}`;
+
+        document.getElementById("output-quantum").innerHTML =
+          formatQuantumState(S1, S2, S3);
+      }
+
+      // --- 6. Event Listeners ---
+      const controlsList = ["q1", "h", "q2"];
+      controlsList.forEach((prefix) => {
+        const check = document.getElementById(`${prefix}_en`);
+        const num = document.getElementById(`${prefix}_num`);
+        const slider = document.getElementById(`${prefix}_slider`);
+
+        check.addEventListener("change", updateSimulation);
+        num.addEventListener("input", (e) => {
+          slider.value = e.target.value;
+          updateSimulation();
+        });
+        slider.addEventListener("input", (e) => {
+          num.value = e.target.value;
+          updateSimulation();
+        });
+      });
+
+      window.addEventListener("resize", () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      // --- 7. Render Loop ---
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      updateSimulation();
+      animate();
+    </script>
+  </body>
+</html>
