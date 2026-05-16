@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RUQu - Fock State Heralding Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              gray: { 750: "#2d3748", 850: "#1a202c", 950: "#0d1117" },
+            },
+          },
+        },
+      };
+      Chart.defaults.color = "#9ca3af";
+      Chart.defaults.borderColor = "#374151";
+    </script>
+    <style>
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input:disabled {
+        background-color: #1a202c;
+        color: #6b7280;
+        border-color: #374151;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-950 text-gray-200 font-sans min-h-screen p-6">
+    <div class="max-w-[90rem] mx-auto">
+      <header class="mb-8 border-b border-gray-800 pb-4">
+        <h1 class="text-3xl font-bold text-white tracking-tight">
+          RUQu - Fock State Heralding Calculator
+        </h1>
+        <p class="text-gray-400 mt-2 text-sm">
+          Analyze bi-directional heralding efficiencies and conditional state
+          collapse across asymmetric channels.
+        </p>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Left Column: Inputs -->
+        <div class="lg:col-span-5 xl:col-span-4 space-y-6">
+          <!-- Source Parameters -->
+          <div
+            class="bg-gray-850 border border-gray-800 rounded-xl p-5 shadow-lg"
+          >
+            <h2
+              class="text-lg font-semibold text-emerald-400 mb-4 flex items-center"
+            >
+              <svg
+                class="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                ></path>
+              </svg>
+              Source Dynamics
+            </h2>
+
+            <div class="space-y-4 text-sm">
+              <div>
+                <label class="block text-gray-400 mb-1"
+                  >Crystal (775 &rarr; 1550nm)</label
+                >
+                <select
+                  id="crystal_type"
+                  class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-emerald-500"
+                  onchange="updateCrystal()"
+                >
+                  <option value="bulk">Bulk ppKTP (~15k)</option>
+                  <option value="apodised">Apodised ppKTP (~8k)</option>
+                  <option value="advr">AdvR Waveguide (~300k)</option>
+                  <option value="custom">Custom...</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Eff. (pairs/s/mW/mm)</label
+                  >
+                  <input
+                    type="number"
+                    id="conv_eff"
+                    value="15000"
+                    disabled
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+                <div>
+                  <label class="block text-gray-400 mb-1">Length (mm)</label>
+                  <input
+                    type="number"
+                    id="crystal_length"
+                    value="10"
+                    step="0.5"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Pump Power (mW)</label
+                  >
+                  <input
+                    type="number"
+                    id="pump_power"
+                    value="50"
+                    step="1"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Bandwidth (GHz)</label
+                  >
+                  <input
+                    type="number"
+                    id="bandwidth"
+                    value="100"
+                    step="1"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-4 pt-3 border-t border-gray-800">
+                <div>
+                  <label class="block text-gray-500 mb-1 text-xs"
+                    >Squeezing (r)</label
+                  >
+                  <input
+                    type="text"
+                    id="squeezing_r"
+                    value="0.00"
+                    readonly
+                    class="w-full bg-gray-800 border border-gray-700 rounded p-1.5 text-emerald-300 font-mono text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label class="block text-gray-500 mb-1 text-xs"
+                    >Squeezing (dB)</label
+                  >
+                  <input
+                    type="text"
+                    id="squeezing_db"
+                    value="0.00"
+                    readonly
+                    class="w-full bg-gray-800 border border-gray-700 rounded p-1.5 text-emerald-300 font-mono text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signal Arm Input -->
+          <div
+            class="bg-gray-850 border border-gray-800 rounded-xl p-5 shadow-lg border-l-4 border-l-blue-500"
+          >
+            <div
+              class="flex justify-between items-end mb-4 border-b border-gray-700 pb-2"
+            >
+              <h3 class="text-md font-bold text-blue-400">Signal Arm (S)</h3>
+              <div class="flex items-center">
+                <label
+                  class="text-blue-400 text-xs font-bold mr-2 uppercase tracking-wide"
+                  >Target Clicks (h<sub>S</sub>) =</label
+                >
+                <input
+                  type="number"
+                  id="herald_h_s"
+                  value="1"
+                  min="1"
+                  max="10"
+                  class="w-12 bg-blue-900/50 border border-blue-500 rounded p-1 text-white text-center text-sm focus:outline-none"
+                  oninput="calculate()"
+                />
+              </div>
+            </div>
+            <div class="space-y-3 text-sm">
+              <div>
+                <label class="block text-gray-400 mb-1">Detector Type</label>
+                <select
+                  id="det_type_s"
+                  class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500"
+                  onchange="calculate()"
+                >
+                  <option value="snspd">SNSPD (Bucket)</option>
+                  <option value="multipixel">Multipixel (16-px)</option>
+                  <option value="tes" selected>TES (Linear PNRD)</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Channel Loss (%)</label
+                  >
+                  <input
+                    type="number"
+                    id="loss_s"
+                    value="20"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Detector Eff (%)</label
+                  >
+                  <input
+                    type="number"
+                    id="eff_s"
+                    value="85"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Idler Arm Input -->
+          <div
+            class="bg-gray-850 border border-gray-800 rounded-xl p-5 shadow-lg border-l-4 border-l-purple-500"
+          >
+            <div
+              class="flex justify-between items-end mb-4 border-b border-gray-700 pb-2"
+            >
+              <h3 class="text-md font-bold text-purple-400">Idler Arm (I)</h3>
+              <div class="flex items-center">
+                <label
+                  class="text-purple-400 text-xs font-bold mr-2 uppercase tracking-wide"
+                  >Target Clicks (h<sub>I</sub>) =</label
+                >
+                <input
+                  type="number"
+                  id="herald_h_i"
+                  value="2"
+                  min="1"
+                  max="10"
+                  class="w-12 bg-purple-900/50 border border-purple-500 rounded p-1 text-white text-center text-sm focus:outline-none"
+                  oninput="calculate()"
+                />
+              </div>
+            </div>
+            <div class="space-y-3 text-sm">
+              <div>
+                <label class="block text-gray-400 mb-1">Detector Type</label>
+                <select
+                  id="det_type_i"
+                  class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-purple-500"
+                  onchange="calculate()"
+                >
+                  <option value="snspd">SNSPD (Bucket)</option>
+                  <option value="multipixel">Multipixel (16-px)</option>
+                  <option value="tes" selected>TES (Linear PNRD)</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Channel Loss (%)</label
+                  >
+                  <input
+                    type="number"
+                    id="loss_i"
+                    value="40"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+                <div>
+                  <label class="block text-gray-400 mb-1"
+                    >Detector Eff (%)</label
+                  >
+                  <input
+                    type="number"
+                    id="eff_i"
+                    value="70"
+                    class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    oninput="calculate()"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Outputs -->
+        <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+          <!-- Raw Singles -->
+          <div
+            class="bg-gray-850 border border-gray-800 rounded-xl p-5 shadow-lg flex justify-between"
+          >
+            <div>
+              <p class="text-gray-400 text-sm mb-1">Raw Singles (Signal)</p>
+              <div class="text-2xl font-mono text-white flex items-baseline">
+                <span id="out_singles_s">0</span>
+                <span class="text-sm text-gray-500 ml-2">cps</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-gray-400 text-sm mb-1">Raw Singles (Idler)</p>
+              <div
+                class="text-2xl font-mono text-white flex items-baseline justify-end"
+              >
+                <span id="out_singles_i">0</span>
+                <span class="text-sm text-gray-500 ml-2">cps</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Symmetric Heralding Logic -->
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <!-- Idler Heralds Signal -->
+            <div
+              class="bg-gray-850 border border-gray-800 rounded-xl p-5 shadow-lg relative overflow-hidden"
+            >
+              <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+              <h2 class="text-lg font-semibold text-white mb-4">
+                Idler Heralds Signal
+                <span
+                  class="text-xs font-normal text-gray-400 bg-gray-800 px-2 py-1 rounded ml-2"
+                  >Condition: I = h<sub>I</sub></span
+                >
+              </h2>
+
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p class="text-gray-400 text-xs mb-1">
+                    Herald Rate (I = h<sub>I</sub>)
+                  </p>
+                  <div class="text-xl font-mono text-purple-400">
+                    <span id="out_rate_herald_i">0</span>
+                    <span class="text-xs">cps</span>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-gray-400 text-xs mb-1">
+                    Coinc (S&ge;1 | I=h<sub>I</sub>)
+                  </p>
+                  <div class="text-xl font-mono text-white">
+                    <span id="out_coinc_si">0</span>
+                    <span class="text-xs">cps</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-gray-800">
+                <p class="text-gray-400 text-sm mb-1">
+                  Heralding Efficiency &eta;<sub>S|I</sub>
+                </p>
+                <div
+                  class="text-3xl font-bold font-mono text-emerald-400"
+                  id="out_eff_si"
+                >
+                  0.0%
+                </div>
+              </div>
+            </div>
+
+            <!-- Signal Heralds Idler -->
+            <div
+              class="bg-gray-850 border border-gray-800 rounded-xl p-5 shadow-lg relative overflow-hidden"
+            >
+              <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+              <h2 class="text-lg font-semibold text-white mb-4">
+                Signal Heralds Idler
+                <span
+                  class="text-xs font-normal text-gray-400 bg-gray-800 px-2 py-1 rounded ml-2"
+                  >Condition: S = h<sub>S</sub></span
+                >
+              </h2>
+
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p class="text-gray-400 text-xs mb-1">
+                    Herald Rate (S = h<sub>S</sub>)
+                  </p>
+                  <div class="text-xl font-mono text-blue-400">
+                    <span id="out_rate_herald_s">0</span>
+                    <span class="text-xs">cps</span>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-gray-400 text-xs mb-1">
+                    Coinc (I&ge;1 | S=h<sub>S</sub>)
+                  </p>
+                  <div class="text-xl font-mono text-white">
+                    <span id="out_coinc_is">0</span>
+                    <span class="text-xs">cps</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-gray-800">
+                <p class="text-gray-400 text-sm mb-1">
+                  Heralding Efficiency &eta;<sub>I|S</sub>
+                </p>
+                <div
+                  class="text-3xl font-bold font-mono text-emerald-400"
+                  id="out_eff_is"
+                >
+                  0.0%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div
+              class="bg-gray-850 border border-gray-800 rounded-xl p-4 shadow-lg"
+            >
+              <h2
+                class="text-xs font-semibold text-purple-300 mb-2 text-center uppercase tracking-wider"
+              >
+                Signal State | Idler = h<sub>I</sub>
+              </h2>
+              <canvas id="chartSI" width="400" height="250"></canvas>
+            </div>
+            <div
+              class="bg-gray-850 border border-gray-800 rounded-xl p-4 shadow-lg"
+            >
+              <h2
+                class="text-xs font-semibold text-blue-300 mb-2 text-center uppercase tracking-wider"
+              >
+                Idler State | Signal = h<sub>S</sub>
+              </h2>
+              <canvas id="chartIS" width="400" height="250"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const crystalEfficiencies = { bulk: 15000, apodised: 8000, advr: 300000 };
+      let chartSI = null,
+        chartIS = null;
+
+      function updateCrystal() {
+        const type = document.getElementById("crystal_type").value;
+        const effInput = document.getElementById("conv_eff");
+        if (crystalEfficiencies[type]) {
+          effInput.value = crystalEfficiencies[type];
+          effInput.disabled = true;
+        } else {
+          effInput.disabled = false;
+        }
+        calculate();
+      }
+
+      function C(n, k) {
+        if (k < 0 || k > n) return 0;
+        if (k === 0 || k === n) return 1;
+        let c = 1;
+        for (let i = 1; i <= k; i++) c = (c * (n - i + 1)) / i;
+        return c;
+      }
+
+      function getPOVM(m, n, eta, type) {
+        if (n < 0 || m < 0) return 0;
+        if (type === "snspd") {
+          if (m === 0) return Math.pow(1 - eta, n);
+          if (m === 1) return 1 - Math.pow(1 - eta, n);
+          return 0;
+        } else if (type === "tes") {
+          if (m > n) return 0;
+          return C(n, m) * Math.pow(eta, m) * Math.pow(1 - eta, n - m);
+        } else if (type === "multipixel") {
+          const N = 16;
+          if (m > N || m > n) return 0;
+          if (m === 0) return Math.pow(1 - eta, n);
+          let sum = 0;
+          for (let k = 0; k <= m; k++) {
+            sum +=
+              Math.pow(-1, k) * C(m, k) * Math.pow(1 - ((m - k) / N) * eta, n);
+          }
+          return C(N, m) * sum;
+        }
+        return 0;
+      }
+
+      function buildChart(
+        ctxId,
+        instance,
+        labels,
+        pState,
+        pDet,
+        colorState,
+        colorDet,
+      ) {
+        if (instance) {
+          instance.data.datasets[0].data = pState;
+          instance.data.datasets[1].data = pDet;
+          instance.update();
+          return instance;
+        } else {
+          const ctx = document.getElementById(ctxId).getContext("2d");
+          return new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "True Quantum State",
+                  data: pState,
+                  backgroundColor: colorState,
+                  borderWidth: 0,
+                  borderRadius: 2,
+                },
+                {
+                  label: "Detected Output",
+                  data: pDet,
+                  backgroundColor: colorDet,
+                  borderWidth: 0,
+                  borderRadius: 2,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true },
+                x: {
+                  title: {
+                    display: true,
+                    text: "Photon / Event Number",
+                    color: "#6b7280",
+                  },
+                },
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  position: "bottom",
+                  labels: { boxWidth: 12, font: { size: 10 } },
+                },
+              },
+            },
+          });
+        }
+      }
+
+      function calculate() {
+        // Fetch Inputs
+        const pumpPower =
+          parseFloat(document.getElementById("pump_power").value) || 0;
+        const convEff =
+          parseFloat(document.getElementById("conv_eff").value) || 0;
+        const length =
+          parseFloat(document.getElementById("crystal_length").value) || 0;
+        const bwHz =
+          (parseFloat(document.getElementById("bandwidth").value) || 100) * 1e9;
+
+        const h_S = parseInt(document.getElementById("herald_h_s").value) || 1;
+        const h_I = parseInt(document.getElementById("herald_h_i").value) || 1;
+
+        const typeS = document.getElementById("det_type_s").value;
+        const etaS =
+          (1 -
+            (parseFloat(document.getElementById("loss_s").value) / 100 || 0)) *
+          (parseFloat(document.getElementById("eff_s").value) / 100 || 0);
+
+        const typeI = document.getElementById("det_type_i").value;
+        const etaI =
+          (1 -
+            (parseFloat(document.getElementById("loss_i").value) / 100 || 0)) *
+          (parseFloat(document.getElementById("eff_i").value) / 100 || 0);
+
+        // Base Math
+        const pairRate = pumpPower * convEff * length;
+        const n_avg = pairRate / bwHz;
+
+        const r = Math.asinh(Math.sqrt(n_avg));
+        document.getElementById("squeezing_r").value = r.toFixed(5);
+        document.getElementById("squeezing_db").value = (8.685889 * r).toFixed(
+          3,
+        );
+
+        const maxN = 30;
+
+        // Marginals & Intersections
+        let p_S_any = 0,
+          p_I_any = 0;
+        let p_S_exact_hs = 0,
+          p_I_exact_hi = 0;
+        let p_coinc_si = 0; // S>=1 AND I=hi
+        let p_coinc_is = 0; // I>=1 AND S=hs
+
+        // Chart Data Arrays
+        let state_S_given_I = Array(8).fill(0),
+          det_S_given_I = Array(8).fill(0);
+        let state_I_given_S = Array(8).fill(0),
+          det_I_given_S = Array(8).fill(0);
+
+        // Pass 1: Sum Marginals
+        for (let n = 0; n <= maxN; n++) {
+          let p_gen = Math.pow(n_avg, n) / Math.pow(1 + n_avg, n + 1);
+
+          let p_click_S = 1 - getPOVM(0, n, etaS, typeS);
+          let p_click_I = 1 - getPOVM(0, n, etaI, typeI);
+
+          let p_S_h = getPOVM(h_S, n, etaS, typeS);
+          let p_I_h = getPOVM(h_I, n, etaI, typeI);
+
+          p_S_any += p_gen * p_click_S;
+          p_I_any += p_gen * p_click_I;
+
+          p_S_exact_hs += p_gen * p_S_h;
+          p_I_exact_hi += p_gen * p_I_h;
+
+          p_coinc_si += p_gen * (p_click_S * p_I_h);
+          p_coinc_is += p_gen * (p_click_I * p_S_h);
+        }
+
+        // Pass 2: Conditionals for Charts
+        for (let n = 0; n <= maxN; n++) {
+          let p_gen = Math.pow(n_avg, n) / Math.pow(1 + n_avg, n + 1);
+
+          // --- Conditioned on I = h_I ---
+          if (p_I_exact_hi > 0) {
+            let p_state_n_given_I =
+              (p_gen * getPOVM(h_I, n, etaI, typeI)) / p_I_exact_hi;
+            if (n < 8) state_S_given_I[n] = p_state_n_given_I;
+            for (let m = 0; m < 8; m++) {
+              det_S_given_I[m] +=
+                p_state_n_given_I * getPOVM(m, n, etaS, typeS);
+            }
+          }
+
+          // --- Conditioned on S = h_S ---
+          if (p_S_exact_hs > 0) {
+            let p_state_n_given_S =
+              (p_gen * getPOVM(h_S, n, etaS, typeS)) / p_S_exact_hs;
+            if (n < 8) state_I_given_S[n] = p_state_n_given_S;
+            for (let m = 0; m < 8; m++) {
+              det_I_given_S[m] +=
+                p_state_n_given_S * getPOVM(m, n, etaI, typeI);
+            }
+          }
+        }
+
+        // Update Charts
+        const labels = Array.from({ length: 8 }, (_, i) => i);
+        chartSI = buildChart(
+          "chartSI",
+          chartSI,
+          labels,
+          state_S_given_I,
+          det_S_given_I,
+          "rgba(156, 163, 175, 0.4)",
+          "rgba(16, 185, 129, 0.8)",
+        );
+        chartIS = buildChart(
+          "chartIS",
+          chartIS,
+          labels,
+          state_I_given_S,
+          det_I_given_S,
+          "rgba(156, 163, 175, 0.4)",
+          "rgba(59, 130, 246, 0.8)",
+        );
+
+        // Rates
+        document.getElementById("out_singles_s").innerText = Math.round(
+          p_S_any * bwHz,
+        ).toLocaleString();
+        document.getElementById("out_singles_i").innerText = Math.round(
+          p_I_any * bwHz,
+        ).toLocaleString();
+
+        document.getElementById("out_rate_herald_i").innerText = Math.round(
+          p_I_exact_hi * bwHz,
+        ).toLocaleString();
+        document.getElementById("out_coinc_si").innerText = Math.round(
+          p_coinc_si * bwHz,
+        ).toLocaleString();
+        let eff_si = p_I_exact_hi > 0 ? (p_coinc_si / p_I_exact_hi) * 100 : 0;
+        document.getElementById("out_eff_si").innerText =
+          eff_si.toFixed(1) + "%";
+
+        document.getElementById("out_rate_herald_s").innerText = Math.round(
+          p_S_exact_hs * bwHz,
+        ).toLocaleString();
+        document.getElementById("out_coinc_is").innerText = Math.round(
+          p_coinc_is * bwHz,
+        ).toLocaleString();
+        let eff_is = p_S_exact_hs > 0 ? (p_coinc_is / p_S_exact_hs) * 100 : 0;
+        document.getElementById("out_eff_is").innerText =
+          eff_is.toFixed(1) + "%";
+      }
+
+      window.onload = calculate;
+    </script>
+  </body>
+</html>
