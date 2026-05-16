@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RUQu: Poincaré Sphere Polarization Simulator</title>
+    <title>Dynamic Poincaré Sphere Polarization Simulator</title>
     <style>
       body {
         margin: 0;
@@ -12,26 +12,55 @@
         background-color: #111;
         color: #fff;
         display: flex;
-        flex-direction: column;
         height: 100vh;
       }
+
       #canvas-container {
         flex-grow: 1;
         position: relative;
       }
-      #controls {
+
+      /* Sidebar layout for dynamic content */
+      #sidebar {
+        width: 380px;
         background: #222;
-        padding: 20px;
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        border-top: 2px solid #444;
+        display: flex;
+        flex-direction: column;
+        border-left: 2px solid #444;
+        z-index: 10;
       }
+
+      /* Scrollable area for stages */
+      #stages-container {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      /* Fixed header and footer inside sidebar */
+      .fixed-panel {
+        padding: 20px;
+        background: #222;
+        border-bottom: 2px solid #333;
+      }
+      #output-container {
+        padding: 20px;
+        background: #1a1a1a;
+        border-top: 2px solid #333;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
       .control-group {
         background: #333;
         padding: 15px;
         border-radius: 8px;
         font-family: sans-serif;
+        position: relative;
       }
       .control-group h3 {
         margin-top: 0;
@@ -39,11 +68,16 @@
         font-size: 16px;
         border-bottom: 1px solid #555;
         padding-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
+
       .input-row {
         display: flex;
         align-items: center;
         margin-bottom: 10px;
+        gap: 10px;
       }
       .input-row label {
         flex-grow: 1;
@@ -52,43 +86,83 @@
         width: 100%;
       }
       input[type="number"] {
-        width: 60px;
+        width: 65px;
         background: #444;
         color: white;
         border: 1px solid #555;
         padding: 4px;
         border-radius: 4px;
-        margin-left: 10px;
+      }
+      select {
+        background: #444;
+        color: white;
+        border: 1px solid #555;
+        padding: 4px;
+        border-radius: 4px;
+        width: 100%;
+        margin-bottom: 10px;
       }
 
-      #output-container {
-        grid-column: span 3;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
+      .btn {
+        cursor: pointer;
+        padding: 8px 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        width: 100%;
+        transition: background 0.2s;
       }
+      .btn:hover {
+        background: #0056b3;
+      }
+      .btn-delete {
+        background: #dc3545;
+        padding: 4px 8px;
+        font-size: 12px;
+        width: auto;
+      }
+      .btn-delete:hover {
+        background: #a71d2a;
+      }
+
       .output-box {
         text-align: center;
-        font-size: 18px;
-        background: #1a1a1a;
-        padding: 12px;
+        font-size: 16px;
+        background: #222;
+        padding: 10px;
         border-radius: 6px;
       }
-      #output-quantum {
-        color: #00ffff;
+      .quantum-text {
         font-weight: bold;
-        font-size: 20px;
+        font-size: 18px;
         letter-spacing: 1px;
       }
+      #input-quantum {
+        color: #00ffff;
+      }
+      #output-quantum {
+        color: #ffff00;
+      }
 
-      .qwp1-color {
-        color: #ff5555;
+      .input-color {
+        color: #00ffff;
       }
-      .hwp-color {
-        color: #55ff55;
+
+      /* Scrollbar styling */
+      ::-webkit-scrollbar {
+        width: 8px;
       }
-      .qwp2-color {
-        color: #5555ff;
+      ::-webkit-scrollbar-track {
+        background: #222;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #555;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #777;
       }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -97,91 +171,71 @@
   <body>
     <div id="canvas-container"></div>
 
-    <div id="controls">
-      <div class="control-group">
-        <h3 class="qwp1-color">Stage 1: QWP 1</h3>
+    <div id="sidebar">
+      <!-- Fixed Input Panel -->
+      <div
+        class="fixed-panel control-group"
+        style="margin: 0; border-radius: 0"
+      >
+        <h3 class="input-color">Input State |&psi;<sub>in</sub>&rang;</h3>
         <div class="input-row">
-          <label><input type="checkbox" id="q1_en" checked /> Enable</label>
+          <label>Amp 'a' (|H&rang;): <span id="a_disp">1.00</span></label>
+        </div>
+        <input
+          type="range"
+          id="a_slider"
+          value="1.0"
+          step="0.01"
+          min="0"
+          max="1"
+        />
+        <div class="input-row" style="margin-top: -5px; margin-bottom: 10px">
+          <label style="color: #aaa; font-size: 0.85em"
+            >Amp 'b' (|V&rang;): <span id="b_disp">0.00</span></label
+          >
         </div>
         <div class="input-row">
-          <label>Angle (&theta;):</label>
+          <!-- Updated phase limits to -360 to +360 -->
+          <label>Phase &phi; (&deg;):</label>
           <input
             type="number"
-            id="q1_num"
-            value="22.5"
-            step="0.1"
-            min="0"
-            max="180"
+            id="phi_num"
+            value="0"
+            step="1"
+            min="-360"
+            max="360"
           />
         </div>
         <input
           type="range"
-          id="q1_slider"
-          value="22.5"
-          step="0.1"
-          min="0"
-          max="180"
+          id="phi_slider"
+          value="0"
+          step="1"
+          min="-360"
+          max="360"
         />
       </div>
 
-      <div class="control-group">
-        <h3 class="hwp-color">Stage 2: HWP</h3>
-        <div class="input-row">
-          <label><input type="checkbox" id="h_en" checked /> Enable</label>
-        </div>
-        <div class="input-row">
-          <label>Angle (&theta;):</label>
-          <input
-            type="number"
-            id="h_num"
-            value="45.0"
-            step="0.1"
-            min="0"
-            max="180"
-          />
-        </div>
-        <input
-          type="range"
-          id="h_slider"
-          value="45.0"
-          step="0.1"
-          min="0"
-          max="180"
-        />
+      <!-- Scrollable Dynamic Stages -->
+      <div id="stages-container">
+        <button class="btn" id="btn-add-stage">+ Add Waveplate Stage</button>
+        <!-- Stages will be injected here -->
       </div>
 
-      <div class="control-group">
-        <h3 class="qwp2-color">Stage 3: QWP 2</h3>
-        <div class="input-row">
-          <label><input type="checkbox" id="q2_en" checked /> Enable</label>
-        </div>
-        <div class="input-row">
-          <label>Angle (&theta;):</label>
-          <input
-            type="number"
-            id="q2_num"
-            value="22.5"
-            step="0.1"
-            min="0"
-            max="180"
-          />
-        </div>
-        <input
-          type="range"
-          id="q2_slider"
-          value="22.5"
-          step="0.1"
-          min="0"
-          max="180"
-        />
-      </div>
-
+      <!-- Fixed Output Panel -->
       <div id="output-container">
-        <div class="output-box" id="output-stokes">
-          Stokes: H/V = 1.000, D/A = 0.000, R/L = 0.000
+        <div class="output-box quantum-text" id="input-quantum">
+          |&psi;<sub>in</sub>&rang; = 1.000 |H&rang; + 0.000 |V&rang;
         </div>
-        <div class="output-box" id="output-quantum">
-          |&psi;&rang; = 1.000 |H&rang; + 0.000 |V&rang;
+        <div
+          class="output-box"
+          id="output-stokes"
+          style="font-size: 14px; color: #ccc"
+        >
+          Stokes: [1.000, 0.000, 0.000]
+        </div>
+        <div class="output-box quantum-text" id="output-quantum">
+          |&psi;<sub>out</sub>&rang; = 1.000 |H&rang; + 0.000 |V&rang;
         </div>
       </div>
     </div>
@@ -220,7 +274,7 @@
       });
       scene.add(new THREE.Mesh(sphereGeo, sphereMat));
 
-      // NEW: Equatorial Plane (50% Grey, 50% Transparency)
+      // Equatorial Plane
       const planeGeo = new THREE.CircleGeometry(sphereRadius, 64);
       const planeMat = new THREE.MeshBasicMaterial({
         color: 0x808080,
@@ -230,7 +284,7 @@
         depthWrite: false,
       });
       const equatorPlane = new THREE.Mesh(planeGeo, planeMat);
-      equatorPlane.rotation.x = Math.PI / 2; // Rotate to lay flat on the X-Z (equatorial) plane
+      equatorPlane.rotation.x = Math.PI / 2;
       scene.add(equatorPlane);
 
       function createAxis(p1, p2, color) {
@@ -275,7 +329,6 @@
         context.textAlign = "center";
         context.textBaseline = "middle";
         context.fillText(text, 64, 64);
-
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({
           map: texture,
@@ -294,13 +347,127 @@
       scene.add(createLabel("D", new THREE.Vector3(0, 0, 1.15), "white"));
       scene.add(createLabel("A", new THREE.Vector3(0, 0, -1.15), "white"));
 
-      // --- 3. Dynamic Elements ---
+      // --- 3. Dynamic Elements & UI Logic ---
       const dynamicGroup = new THREE.Group();
       scene.add(dynamicGroup);
 
+      // Color Palette for stages (HTML hex strings)
+      const stageColors = [
+        "#ff5555",
+        "#55ff55",
+        "#5555ff",
+        "#ffff55",
+        "#ffaa00",
+        "#ff55ff",
+        "#55ffff",
+      ];
+      let stageIdCounter = 0;
+      let activeStages = []; // Array to hold stage state objects
+
+      function addStageUI() {
+        const id = stageIdCounter++;
+        const colorStr = stageColors[activeStages.length % stageColors.length];
+        const colorHex = parseInt(colorStr.replace("#", "0x"));
+
+        // Create Stage Object
+        const stage = {
+          id: id,
+          type: "QWP", // default
+          angle: 22.5, // default
+          enabled: true,
+          colorStr: colorStr,
+          colorHex: colorHex,
+        };
+        activeStages.push(stage);
+
+        // Build DOM Element - Updated min/max limits to -360/360
+        const stageDiv = document.createElement("div");
+        stageDiv.className = "control-group";
+        stageDiv.style.borderLeft = `4px solid ${colorStr}`;
+        stageDiv.id = `stage-${id}`;
+
+        stageDiv.innerHTML = `
+            <h3 style="color: ${colorStr}">
+                Stage ${activeStages.length} 
+                <button class="btn btn-delete" onclick="removeStage(${id})">Delete</button>
+            </h3>
+            <div class="input-row">
+                <label><input type="checkbox" id="en-${id}" checked> Enable</label>
+            </div>
+            <select id="type-${id}">
+                <option value="QWP" selected>Quarter-Wave Plate (QWP)</option>
+                <option value="HWP">Half-Wave Plate (HWP)</option>
+                <option value="FWP">Full-Wave Plate (FWP)</option>
+            </select>
+            <div class="input-row">
+                <label>Angle (&theta;):</label>
+                <input type="number" id="num-${id}" value="${stage.angle}" step="0.1" min="-360" max="360">
+            </div>
+            <input type="range" id="slider-${id}" value="${stage.angle}" step="0.1" min="-360" max="360">
+        `;
+
+        // Insert before the "Add Stage" button
+        const container = document.getElementById("stages-container");
+        const addButton = document.getElementById("btn-add-stage");
+        container.insertBefore(stageDiv, addButton);
+
+        // Add Event Listeners
+        document.getElementById(`en-${id}`).addEventListener("change", (e) => {
+          stage.enabled = e.target.checked;
+          updateSimulation();
+        });
+        document
+          .getElementById(`type-${id}`)
+          .addEventListener("change", (e) => {
+            stage.type = e.target.value;
+            updateSimulation();
+          });
+        const numInput = document.getElementById(`num-${id}`);
+        const sliderInput = document.getElementById(`slider-${id}`);
+
+        numInput.addEventListener("input", (e) => {
+          sliderInput.value = e.target.value;
+          stage.angle = parseFloat(e.target.value);
+          updateSimulation();
+        });
+        sliderInput.addEventListener("input", (e) => {
+          numInput.value = e.target.value;
+          stage.angle = parseFloat(e.target.value);
+          updateSimulation();
+        });
+
+        relabelStages();
+        updateSimulation();
+      }
+
+      // Must be attached to window so inline onclick="removeStage()" works
+      window.removeStage = function (id) {
+        activeStages = activeStages.filter((s) => s.id !== id);
+        document.getElementById(`stage-${id}`).remove();
+        relabelStages();
+        updateSimulation();
+      };
+
+      function relabelStages() {
+        const stageDivs = document.querySelectorAll(
+          "#stages-container .control-group",
+        );
+        stageDivs.forEach((div, index) => {
+          const h3 = div.querySelector("h3");
+          // Update Title number but preserve color and delete button
+          const btnHtml = h3.innerHTML.match(/<button.*<\/button>/)[0];
+          h3.innerHTML = `Stage ${index + 1} ${btnHtml}`;
+        });
+      }
+
+      document
+        .getElementById("btn-add-stage")
+        .addEventListener("click", addStageUI);
+
+      // --- 4. Drawing Utilities ---
       function drawArc(vStart, axis, angle, color) {
         const points = [];
-        const segments = 30;
+        const segments = Math.max(30, Math.floor(angle * 20)); // More segments for larger angles
         for (let i = 0; i <= segments; i++) {
           const t = i / segments;
           const currentAngle = t * angle;
@@ -334,13 +501,11 @@
         return line;
       }
 
-      // --- 4. Quantum State Formatting ---
-      function formatQuantumState(S1, S2, S3) {
+      function formatQuantumState(S1, S2, S3, label = "|&psi;&rang;") {
         let cH = Math.sqrt(Math.max(0, (1 + S1) / 2));
-        let cV_re = 0;
-        let cV_im = 0;
+        let cV_re = 0,
+          cV_im = 0;
 
-        // Avoid division by zero when state is purely |V> (S1 = -1)
         if (cH > 0.0001) {
           cV_re = S2 / (2 * cH);
           cV_im = S3 / (2 * cH);
@@ -360,123 +525,127 @@
 
         let cV_term = `${cV_re_str} ${sign} ${cV_im_str}i`;
 
-        // Simplify purely real or purely imaginary terms
         if (Math.abs(cV_im) < 0.0005) cV_term = `${cV_re_str}`;
         else if (Math.abs(cV_re) < 0.0005)
           cV_term = `${sign === "-" ? "-" : ""}${cV_im_str}i`;
 
-        // Wrap complex terms in parentheses
-        if (Math.abs(cV_im) >= 0.0005 && Math.abs(cV_re) >= 0.0005) {
+        if (Math.abs(cV_im) >= 0.0005 && Math.abs(cV_re) >= 0.0005)
           cV_term = `(${cV_term})`;
-        }
 
-        // Construct final Dirac notation string
-        if (cH === 0) return `|&psi;&rang; = ${cV_term} |V&rang;`;
+        if (cH === 0) return `${label} = ${cV_term} |V&rang;`;
         if (Math.abs(cV_re) < 0.0005 && Math.abs(cV_im) < 0.0005)
-          return `|&psi;&rang; = ${cH_str} |H&rang;`;
+          return `${label} = ${cH_str} |H&rang;`;
 
-        return `|&psi;&rang; = ${cH_str} |H&rang; + ${cV_term} |V&rang;`;
+        return `${label} = ${cH_str} |H&rang; + ${cV_term} |V&rang;`;
       }
 
-      // --- 5. Math & Update Logic ---
+      // --- 5. Main Simulation Loop ---
       function updateSimulation() {
         dynamicGroup.clear();
 
-        const q1_en = document.getElementById("q1_en").checked;
-        const q1_theta =
-          (parseFloat(document.getElementById("q1_num").value) * Math.PI) / 180;
-        const h_en = document.getElementById("h_en").checked;
-        const h_theta =
-          (parseFloat(document.getElementById("h_num").value) * Math.PI) / 180;
-        const q2_en = document.getElementById("q2_en").checked;
-        const q2_theta =
-          (parseFloat(document.getElementById("q2_num").value) * Math.PI) / 180;
+        // 1. Calculate Input State
+        const a = parseFloat(document.getElementById("a_slider").value);
+        const b = Math.sqrt(1 - a * a);
+        document.getElementById("a_disp").innerText = a.toFixed(2);
+        document.getElementById("b_disp").innerText = b.toFixed(2);
 
-        const c_q1 = 0xff5555,
-          c_h = 0x55ff55,
-          c_q2 = 0x5555ff;
-        let currentState = new THREE.Vector3(1, 0, 0);
-        dynamicGroup.add(drawPoint(currentState, 0xffffff, 0.04));
+        const phi_rad =
+          (parseFloat(document.getElementById("phi_num").value) * Math.PI) /
+          180;
 
-        if (q1_en) {
-          const axisQ1 = new THREE.Vector3(
-            Math.cos(2 * q1_theta),
+        const S1_in = a * a - b * b;
+        const S2_in = 2 * a * b * Math.cos(phi_rad);
+        const S3_in = 2 * a * b * Math.sin(phi_rad);
+
+        document.getElementById("input-quantum").innerHTML = formatQuantumState(
+          S1_in,
+          S2_in,
+          S3_in,
+          "|&psi;<sub>in</sub>&rang;",
+        );
+
+        // Set initial Vector (X=H/V, Z=D/A, Y=R/L)
+        let currentState = new THREE.Vector3(S1_in, S3_in, S2_in);
+        dynamicGroup.add(drawPoint(currentState, 0x00ffff, 0.05));
+
+        // 2. Iterate dynamically through active stages
+        activeStages.forEach((stage) => {
+          if (!stage.enabled) return; // Skip if bypassed
+
+          const theta_rad = (stage.angle * Math.PI) / 180;
+          const axisK = new THREE.Vector3(
+            Math.cos(2 * theta_rad),
             0,
-            Math.sin(2 * q1_theta),
+            Math.sin(2 * theta_rad),
           ).normalize();
-          dynamicGroup.add(drawRotationAxis(axisQ1, c_q1));
-          dynamicGroup.add(drawArc(currentState, axisQ1, Math.PI / 2, c_q1));
-          currentState.applyAxisAngle(axisQ1, Math.PI / 2);
-          dynamicGroup.add(drawPoint(currentState, c_q1, 0.04));
-        }
 
-        if (h_en) {
-          const axisH = new THREE.Vector3(
-            Math.cos(2 * h_theta),
-            0,
-            Math.sin(2 * h_theta),
-          ).normalize();
-          dynamicGroup.add(drawRotationAxis(axisH, c_h));
-          dynamicGroup.add(drawArc(currentState, axisH, Math.PI, c_h));
-          currentState.applyAxisAngle(axisH, Math.PI);
-          dynamicGroup.add(drawPoint(currentState, c_h, 0.04));
-        }
+          let delta;
+          if (stage.type === "QWP") delta = Math.PI / 2;
+          else if (stage.type === "HWP") delta = Math.PI;
+          else if (stage.type === "FWP") delta = Math.PI * 2; // Full circle!
 
-        if (q2_en) {
-          const axisQ2 = new THREE.Vector3(
-            Math.cos(2 * q2_theta),
-            0,
-            Math.sin(2 * q2_theta),
-          ).normalize();
-          dynamicGroup.add(drawRotationAxis(axisQ2, c_q2));
-          dynamicGroup.add(drawArc(currentState, axisQ2, Math.PI / 2, c_q2));
-          currentState.applyAxisAngle(axisQ2, Math.PI / 2);
-        }
+          // Draw Rotation Setup
+          dynamicGroup.add(drawRotationAxis(axisK, stage.colorHex));
+          dynamicGroup.add(drawArc(currentState, axisK, delta, stage.colorHex));
 
+          // Apply Math
+          currentState.applyAxisAngle(axisK, delta);
+          dynamicGroup.add(drawPoint(currentState, stage.colorHex, 0.04));
+        });
+
+        // Highlight Final Target Destination Point
         dynamicGroup.add(drawPoint(currentState, 0xffff00, 0.07));
 
-        // Coordinate mapping: X = S1(H/V), Z = S2(D/A), Y = S3(R/L)
-        const S1 = currentState.x;
-        const S2 = currentState.z;
-        const S3 = currentState.y;
-
+        // Output formatting
         document.getElementById("output-stokes").innerHTML =
-          `Stokes Vector: H/V = ${S1.toFixed(3)}, D/A = ${S2.toFixed(3)}, R/L = ${S3.toFixed(3)}`;
+          `Final Stokes [H/V, D/A, R/L]: [${currentState.x.toFixed(3)}, ${currentState.z.toFixed(3)}, ${currentState.y.toFixed(3)}]`;
 
         document.getElementById("output-quantum").innerHTML =
-          formatQuantumState(S1, S2, S3);
+          formatQuantumState(
+            currentState.x,
+            currentState.z,
+            currentState.y,
+            "|&psi;<sub>out</sub>&rang;",
+          );
       }
 
-      // --- 6. Event Listeners ---
-      const controlsList = ["q1", "h", "q2"];
-      controlsList.forEach((prefix) => {
-        const check = document.getElementById(`${prefix}_en`);
-        const num = document.getElementById(`${prefix}_num`);
-        const slider = document.getElementById(`${prefix}_slider`);
-
-        check.addEventListener("change", updateSimulation);
-        num.addEventListener("input", (e) => {
-          slider.value = e.target.value;
-          updateSimulation();
-        });
-        slider.addEventListener("input", (e) => {
-          num.value = e.target.value;
-          updateSimulation();
-        });
+      // Input state event listeners
+      document
+        .getElementById("a_slider")
+        .addEventListener("input", updateSimulation);
+      document.getElementById("phi_num").addEventListener("input", (e) => {
+        document.getElementById("phi_slider").value = e.target.value;
+        updateSimulation();
+      });
+      document.getElementById("phi_slider").addEventListener("input", (e) => {
+        document.getElementById("phi_num").value = e.target.value;
+        updateSimulation();
       });
 
+      // Handle resizing gracefully with side panel
       window.addEventListener("resize", () => {
         camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
       });
 
-      // --- 7. Render Loop ---
+      // --- 6. Init ---
       function animate() {
         requestAnimationFrame(animate);
         controls.update();
         renderer.render(scene, camera);
       }
+
+      // Initialize with a default setup (e.g. QWP -> HWP -> QWP)
+      addStageUI();
+      document.getElementById(`type-${activeStages[0].id}`).value = "QWP";
+      addStageUI();
+      document.getElementById(`type-${activeStages[1].id}`).value = "HWP";
+      document.getElementById(`num-${activeStages[1].id}`).value = 45;
+      document.getElementById(`slider-${activeStages[1].id}`).value = 45;
+      activeStages[1].angle = 45;
+      addStageUI();
+      document.getElementById(`type-${activeStages[2].id}`).value = "QWP";
 
       updateSimulation();
       animate();
