@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RUQu - Attenuated Photon Number Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              gray: {
+                900: "#0f172a",
+                800: "#1e293b",
+                700: "#334155",
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+      <h1 class="text-3xl font-bold mb-8 text-sky-400">
+        RUQu - Attenuated Photon Number Calculator
+      </h1>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Inputs Column -->
+        <div
+          class="lg:col-span-1 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg"
+        >
+          <h2
+            class="text-xl font-semibold mb-6 text-white border-b border-gray-700 pb-2"
+          >
+            Pulse Parameters
+          </h2>
+
+          <div class="space-y-4">
+            <!-- Wavelength -->
+            <div>
+              <label class="block text-sm text-gray-400 mb-1"
+                >Wavelength (nm)</label
+              >
+              <input
+                type="number"
+                id="wavelength"
+                value="1550"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500 transition-colors"
+              />
+            </div>
+
+            <!-- Repetition Rate -->
+            <div>
+              <label class="block text-sm text-gray-400 mb-1"
+                >Repetition Rate (MHz)</label
+              >
+              <input
+                type="number"
+                id="repRate"
+                value="100"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500 transition-colors"
+              />
+            </div>
+
+            <!-- Average Power -->
+            <div>
+              <label class="block text-sm text-gray-400 mb-1"
+                >Initial Average Power (mW)</label
+              >
+              <input
+                type="number"
+                id="power"
+                value="1"
+                step="0.1"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500 transition-colors"
+              />
+            </div>
+
+            <!-- Pulse Width -->
+            <div>
+              <label class="block text-sm text-gray-400 mb-1"
+                >Pulse Width (fs)
+                <span class="text-xs text-gray-500"
+                  >- Used for Peak Power</span
+                ></label
+              >
+              <input
+                type="number"
+                id="pulseWidth"
+                value="100"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500 transition-colors"
+              />
+            </div>
+
+            <!-- Attenuation -->
+            <div>
+              <label class="block text-sm text-gray-400 mb-1"
+                >Added Attenuation (dB)</label
+              >
+              <div class="flex items-center space-x-3">
+                <input
+                  type="number"
+                  id="attenuation"
+                  value="85"
+                  step="0.1"
+                  class="w-2/3 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500 transition-colors"
+                />
+                <div
+                  class="w-1/3 text-sm text-sky-400 font-mono bg-gray-900 px-2 py-2 rounded border border-gray-700 text-center"
+                  id="attenPercent"
+                >
+                  0.00%
+                </div>
+              </div>
+            </div>
+
+            <!-- State Type -->
+            <div>
+              <label class="block text-sm text-gray-400 mb-1"
+                >Quantum State</label
+              >
+              <select
+                id="stateType"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500 transition-colors"
+              >
+                <option value="coherent">Coherent State (Poissonian)</option>
+                <option value="thermal">Thermal State (Bose-Einstein)</option>
+                <option value="squeezed_single">
+                  Single-Mode Squeezed Vacuum
+                </option>
+                <option value="squeezed_two">
+                  Two-Mode Squeezed Vacuum (Pairs)
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outputs and Graph Column -->
+        <div class="lg:col-span-2 space-y-8">
+          <!-- Output Metrics -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div
+              class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg text-center border-t-4 border-t-emerald-400"
+            >
+              <div class="text-sm text-gray-400 mb-2">Mean Photons / Sec</div>
+              <div
+                class="text-xl font-bold text-emerald-400 font-mono"
+                id="outPerSec"
+              >
+                0
+              </div>
+            </div>
+            <div
+              class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg text-center border-t-4 border-t-sky-500"
+            >
+              <div class="text-sm text-gray-400 mb-2">
+                Mean Photons / Pulse (n̄)
+              </div>
+              <div
+                class="text-xl font-bold text-sky-400 font-mono"
+                id="outPerPulse"
+              >
+                0
+              </div>
+            </div>
+            <div
+              class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg text-center border-t-4 border-t-amber-500"
+            >
+              <div class="text-sm text-gray-400 mb-2">
+                Mean Power (Attenuated)
+              </div>
+              <div
+                class="text-xl font-bold text-amber-500 font-mono"
+                id="outMeanPower"
+              >
+                0
+              </div>
+            </div>
+            <div
+              class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg text-center border-t-4 border-t-purple-400"
+            >
+              <div class="text-sm text-gray-400 mb-2">Effective Peak Power</div>
+              <div
+                class="text-xl font-bold text-purple-400 font-mono"
+                id="outPeakPower"
+              >
+                0
+              </div>
+            </div>
+          </div>
+
+          <!-- Graph -->
+          <div
+            class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg"
+          >
+            <h2 class="text-xl font-semibold mb-4 text-white">
+              Photon Number Distribution P(n) per pulse
+            </h2>
+            <div class="relative h-96 w-full">
+              <canvas id="distChart"></canvas>
+            </div>
+            <p class="text-xs text-gray-500 mt-4" id="graphNote">
+              * Distributions are calculated dynamically. High mean photon
+              numbers will auto-center to prevent browser lag. For Two-Mode
+              Squeezed Vacuum, n represents the total photon number across both
+              modes (yielding strictly even outcomes).
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let chartInstance = null;
+
+      // Mathematical utility for log of factorial to prevent large number overflow
+      function lnFact(n) {
+        if (n <= 1) return 0;
+        let res = 0;
+        for (let i = 2; i <= n; i++) res += Math.log(i);
+        return res;
+      }
+
+      // Calculation core
+      function updateCalculations() {
+        // Get values
+        const lambda_nm = parseFloat(
+          document.getElementById("wavelength").value,
+        );
+        const repRate_mhz = parseFloat(
+          document.getElementById("repRate").value,
+        );
+        const power_mw = parseFloat(document.getElementById("power").value);
+        const pulseWidth_fs = parseFloat(
+          document.getElementById("pulseWidth").value,
+        );
+        const atten_db = parseFloat(
+          document.getElementById("attenuation").value,
+        );
+        const stateType = document.getElementById("stateType").value;
+
+        // Physical constants
+        const h = 6.62607015e-34; // J*s
+        const c = 299792458; // m/s
+
+        // Conversions
+        const lambda_m = lambda_nm * 1e-9;
+        const repRate_hz = repRate_mhz * 1e6;
+        const power_w = power_mw * 1e-3;
+        const pulseWidth_s = pulseWidth_fs * 1e-15;
+
+        // Attenuation Math
+        const transmission = Math.pow(10, -atten_db / 10);
+        const transmissionPercent = transmission * 100;
+
+        // Format percentage beautifully depending on scale
+        let pctText =
+          transmissionPercent > 0.01
+            ? transmissionPercent.toFixed(2) + "%"
+            : transmissionPercent.toExponential(2) + "%";
+        document.getElementById("attenPercent").innerText = pctText;
+
+        // Energy and Power Math
+        const eff_power_w = power_w * transmission;
+        const energy_per_photon = (h * c) / lambda_m;
+
+        const photons_per_sec = eff_power_w / energy_per_photon;
+        const n_mean = photons_per_sec / repRate_hz; // Photons per pulse
+
+        // Peak Power (Effective Energy per pulse / Pulse width)
+        const energy_per_pulse = eff_power_w / repRate_hz;
+        const peak_power_w = energy_per_pulse / pulseWidth_s;
+
+        // Update UI
+        document.getElementById("outPerSec").innerText =
+          formatNumber(photons_per_sec);
+        document.getElementById("outPerPulse").innerText = formatNumber(n_mean);
+        document.getElementById("outMeanPower").innerText =
+          formatPowerDynamicPrecision(eff_power_w);
+        document.getElementById("outPeakPower").innerText =
+          formatPowerDynamicPrecision(peak_power_w);
+
+        // Redraw Graph
+        renderDistribution(n_mean, stateType);
+      }
+
+      function formatNumber(num) {
+        if (num === 0) return "0";
+        if (num < 0.001 || num > 10000) return num.toExponential(3);
+        return num.toFixed(3);
+      }
+
+      // Formats to 3 Sig Figs and Auto-Scales Units
+      function formatPowerDynamicPrecision(watts) {
+        if (watts === 0) return "0.00 W";
+
+        const units = ["W", "mW", "µW", "nW", "pW"];
+        let unitIndex = 0;
+        let value = watts;
+
+        // Scale value up until it is >= 1, or we hit the lowest unit (pW)
+        while (value < 1 && unitIndex < units.length - 1) {
+          value *= 1000;
+          unitIndex++;
+        }
+
+        // Check if rounding to 3 sig figs bumps the value up to 1000+
+        // (e.g. 999.9 mW -> 1.00 W instead of 1000 mW)
+        if (parseFloat(value.toPrecision(3)) >= 1000 && unitIndex > 0) {
+          value /= 1000;
+          unitIndex--;
+        }
+
+        return value.toPrecision(3) + " " + units[unitIndex];
+      }
+
+      // Generate Distribution Data
+      function renderDistribution(n_mean, stateType) {
+        let labels = [];
+        let data = [];
+        let start = 0;
+        let max_points = 60;
+
+        // Calculate a reasonable viewing window
+        let end = Math.max(15, Math.ceil(n_mean * 2.5));
+
+        // If n_mean is very large, center the graph around the peak to avoid massive loop delays
+        if (n_mean > 500) {
+          let std_dev = Math.sqrt(n_mean);
+          if (stateType === "thermal") std_dev = n_mean; // Thermal has wider variance
+          start = Math.max(0, Math.floor(n_mean - 4 * std_dev));
+          end = Math.ceil(n_mean + 4 * std_dev);
+        }
+
+        let step = Math.max(1, Math.ceil((end - start) / max_points));
+
+        for (let n = start; n <= end; n += step) {
+          labels.push(n);
+          let p = 0;
+
+          if (n_mean === 0) {
+            p = n === 0 ? 1 : 0;
+          } else {
+            if (stateType === "coherent") {
+              // P(n) = exp(-n_mean) * n_mean^n / n!
+              p = Math.exp(-n_mean + n * Math.log(n_mean) - lnFact(n));
+            } else if (stateType === "thermal") {
+              // P(n) = n_mean^n / (1 + n_mean)^(n+1)
+              p = Math.exp(
+                n * Math.log(n_mean) - (n + 1) * Math.log(1 + n_mean),
+              );
+            } else if (stateType === "squeezed_single") {
+              // Only even photon numbers allowed
+              if (n % 2 !== 0) {
+                p = 0;
+              } else {
+                let m = n / 2;
+                // Uses logarithmic form of: ((2m)! / (2^m m!)^2) * (n_mean / (1+n_mean))^m / sqrt(1+n_mean)
+                let ln_p =
+                  lnFact(2 * m) -
+                  2 * (m * Math.log(2) + lnFact(m)) +
+                  m * Math.log(n_mean / (1 + n_mean)) -
+                  0.5 * Math.log(1 + n_mean);
+                p = Math.exp(ln_p);
+              }
+            } else if (stateType === "squeezed_two") {
+              // n represents total photons. Assumes strictly correlated pairs (n = 2m).
+              if (n % 2 !== 0) {
+                p = 0;
+              } else {
+                let m = n / 2;
+                let n_pairs = n_mean / 2;
+                p = Math.exp(
+                  m * Math.log(n_pairs) - (m + 1) * Math.log(1 + n_pairs),
+                );
+              }
+            }
+          }
+          data.push(p);
+        }
+
+        drawChart(labels, data, stateType);
+      }
+
+      function drawChart(labels, data, stateType) {
+        const ctx = document.getElementById("distChart").getContext("2d");
+
+        // Set color based on state for visual feedback
+        let color = "rgba(56, 189, 248, 0.7)"; // Sky blue for Coherent
+        if (stateType === "thermal") color = "rgba(248, 113, 113, 0.7)"; // Red for Thermal
+        if (stateType === "squeezed_single") color = "rgba(167, 139, 250, 0.7)"; // Purple for Squeezed
+        if (stateType === "squeezed_two") color = "rgba(52, 211, 153, 0.7)"; // Emerald for TMSV
+
+        if (chartInstance) {
+          chartInstance.destroy();
+        }
+
+        chartInstance = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Probability P(n)",
+                data: data,
+                backgroundColor: color,
+                borderColor: color.replace("0.7", "1"),
+                borderWidth: 1,
+                borderRadius: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: "Photon Number (n)",
+                  color: "#94a3b8",
+                },
+                ticks: { color: "#94a3b8" },
+                grid: { color: "#334155", display: false },
+              },
+              y: {
+                title: { display: true, text: "Probability", color: "#94a3b8" },
+                ticks: { color: "#94a3b8" },
+                grid: { color: "#334155" },
+                beginAtZero: true,
+              },
+            },
+            plugins: {
+              legend: { labels: { color: "#e2e8f0" } },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return `P(${context.label}) = ${context.raw.toExponential(3)}`;
+                  },
+                },
+              },
+            },
+            animation: { duration: 400 },
+          },
+        });
+      }
+
+      // Attach Event Listeners to all inputs
+      const inputs = [
+        "wavelength",
+        "repRate",
+        "power",
+        "pulseWidth",
+        "attenuation",
+        "stateType",
+      ];
+      inputs.forEach((id) => {
+        document
+          .getElementById(id)
+          .addEventListener("input", updateCalculations);
+      });
+
+      // Initialize on load
+      window.onload = updateCalculations;
+    </script>
+  </body>
+</html>
